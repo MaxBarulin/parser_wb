@@ -21,12 +21,13 @@
 
         <label for="minReviews">Минимальное количество отзывов:</label>
         <input type="number" id="minReviews" min="0" value="0">
-
+        <br>
         <button id="filterBtn">Применить фильтры</button>
     </div>
 
     <div class="sorting">
         <h2>Сортировка</h2>
+        <label for="sortOptions">Выберите сортировку:</label> <!-- Добавлено для ясности -->
         <select id="sortOptions">
             <option value="nameAsc">По названию (А-Я)</option>
             <option value="nameDesc">По названию (Я-А)</option>
@@ -37,6 +38,7 @@
             <option value="reviewsAsc">По отзывам (возрастание)</option>
             <option value="reviewsDesc">По отзывам (убывание)</option>
         </select>
+        <br>
         <button id="sortBtn">Применить сортировку</button>
     </div>
 
@@ -71,6 +73,6 @@
 </div>
 
 <script src="{% static 'js/script.js' %}"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Исправлен пробел в src -->
 </body>
 </html>

@@ -1,0 +1,117 @@
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+.container {
+    width: 80%;
+    margin: 20px auto;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2 {
+    text-align: center;
+    color: #333;
+}
+
+/* Добавлены отступы снизу для секций */
+.filters, .sorting {
+    margin: 20px 0 30px 0; /* Добавили больше отступа снизу */
+}
+
+label {
+    display: block;
+    margin: 10px 0 5px 0; /* Уменьшили нижний отступ */
+}
+
+/* Добавлен box-sizing */
+input[type="range"],
+input[type="number"],
+select,
+button {
+    box-sizing: border-box; /* Включаем padding/border в width */
+}
+
+/* Ширина полей ввода */
+input[type="range"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Стиль для кнопок (можно сделать их компактнее) */
+button {
+    /* width: 500px; */ /* Закомментируем, если хотим ширину по содержимому или другую */
+    width: auto; /* Ширина по содержимому */
+    padding: 10px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 15px; /* Добавим отступ сверху */
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+/* Стиль для отображения диапазона цен */
+#priceValue {
+    display: block; /* Чтобы он был на отдельной строке */
+    margin-top: 5px; /* Отступ сверху */
+    margin-bottom: 10px; /* Отступ снизу перед следующим лейблом */
+    font-weight: bold;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background-color: #4CAF50;
+    color: white;
+}
+
+th, td {
+    padding: 12px;
+    border: 1px solid #ddd;
+}
+
+tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Выделение рейтинга */
+td:nth-child(4) {
+    color: #FF5722;
+    font-weight: bold;
+}
+
+/* Стиль для контейнеров графиков
+.charts {
+    margin: 20px 0;
+}
+.charts h2 {
+    margin-bottom: 15px;
+}*/
+/* Центрируем канвасы, если нужно
+.charts canvas {
+    display: block;
+    margin: 0 auto 15px auto; Центрируем и добавляем отступ снизу
+}
+*/

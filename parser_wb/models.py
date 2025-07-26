@@ -3,8 +3,8 @@ from django.db import models
 
 class Product(models.Model):
     name = models.CharField(max_length=255, verbose_name='название товара')
-    price = models.PositiveIntegerField(verbose_name='цена')
-    price_discount = models.PositiveIntegerField(verbose_name='цена со скидкой')
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='цена (руб.)')
+    price_discount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='цена со скидкой (руб.)', null=True, blank=True)
     rating = models.DecimalField(max_digits=10, decimal_places=1, verbose_name='рейтинг')
     feedbacks = models.PositiveIntegerField(verbose_name='количество отзывов')
 
