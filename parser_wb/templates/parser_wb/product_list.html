@@ -1,78 +1,79 @@
+<!-- F:/replicate/parser_wb/templates/parser_wb/product_list.html -->
 <!DOCTYPE html>
 {% load static %}
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-T">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
-    <title>Список товаров</title>
+    <title>Список товаров (Gold Apple)</title>
+    <!-- Вы можете добавить сюда свой CSS, если он есть -->
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .container { max-width: 1200px; margin: auto; }
+        .controls { display: flex; gap: 2em; margin-bottom: 1em; padding: 1em; background: #f4f4f4; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
 </head>
 <body>
 <div class="container">
-    <h1>Список товаров</h1>
-    <div class="filters">
-        <h2>Фильтры</h2>
-        <label for="priceRange">Диапазон цен:</label>
-        <input type="range" id="priceRange" min="0" max="5000" value="5000">
-        <span id="priceValue">0 - 5000 ₽</span>
+    <h1>Список товаров из Gold Apple</h1>
 
-        <label for="minRating">Минимальный рейтинг:</label>
-        <input type="number" id="minRating" min="0" max="5" step="0.1" value="0">
+    <div class="controls">
+        <div class="filters">
+            <h3>Фильтры</h3>
+            <div>
+                <label for="priceRange">Макс. цена:</label>
+                <input type="range" id="priceRange" min="0" max="50000" value="50000" step="500">
+                <span id="priceValue">50000 ₽</span>
+            </div>
+            <div>
+                <label for="minRating">Мин. рейтинг:</label>
+                <input type="number" id="minRating" min="0" max="5" step="0.1" value="0">
+            </div>
+        </div>
 
-        <label for="minReviews">Минимальное количество отзывов:</label>
-        <input type="number" id="minReviews" min="0" value="0">
-        <br>
-        <button id="filterBtn">Применить фильтры</button>
-    </div>
-
-    <div class="sorting">
-        <h2>Сортировка</h2>
-        <label for="sortOptions">Выберите сортировку:</label> <!-- Добавлено для ясности -->
-        <select id="sortOptions">
-            <option value="nameAsc">По названию (А-Я)</option>
-            <option value="nameDesc">По названию (Я-А)</option>
-            <option value="priceAsc">По цене (возрастание)</option>
-            <option value="priceDesc">По цене (убывание)</option>
-            <option value="ratingAsc">По рейтингу (возрастание)</option>
-            <option value="ratingDesc">По рейтингу (убывание)</option>
-            <option value="reviewsAsc">По отзывам (возрастание)</option>
-            <option value="reviewsDesc">По отзывам (убывание)</option>
-        </select>
-        <br>
-        <button id="sortBtn">Применить сортировку</button>
-    </div>
-
-    <div class="charts">
-        <h2>Графики</h2>
-        <canvas id="priceHistogram" width="400" height="200"></canvas>
-        <canvas id="discountVsRating" width="400" height="200"></canvas>
+        <div class="sorting">
+            <h3>Сортировка</h3>
+            <select id="sortOptions">
+                <option value="default">По умолчанию</option>
+                <option value="nameAsc">По названию (А-Я)</option>
+                <option value="nameDesc">По названию (Я-А)</option>
+                <option value="priceAsc">По цене (возрастание)</option>
+                <option value="priceDesc">По цене (убывание)</option>
+                <option value="ratingDesc">По рейтингу (убывание)</option>
+                <option value="ratingAsc">По рейтингу (возрастание)</option>
+            </select>
+        </div>
     </div>
 
     <table id="productTable">
         <thead>
         <tr>
             <th>Название товара</th>
-            <th>Цена</th>
-            <th>Цена со скидкой</th>
+            <th>Цена (₽)</th>
             <th>Рейтинг</th>
-            <th>Количество отзывов</th>
+            <th>Страна</th>
+            <th>Ссылка</th>
         </tr>
         </thead>
         <tbody>
         {% for product in products %}
         <tr>
-            <td>{{ product.name }}</td>
-            <td>{{ product.price }}</td>
-            <td>{{ product.price_discount }}</td>
-            <td>{{ product.rating }}</td>
-            <td>{{ product.feedbacks }}</td>
+            <!-- Эти скрытые теги будут использоваться JS для чтения данных -->
+            <td class="product-name">{{ product.name }}</td>
+            <td class="product-price">{{ product.price }}</td>
+            <td class="product-rating">{{ product.rating|default:"0" }}</td>
+            <td class="product-country">{{ product.country|default:"-" }}</td>
+            <td class="product-url"><a href="{{ product.product_url }}" target="_blank">Перейти</a></td>
         </tr>
         {% endfor %}
         </tbody>
     </table>
 </div>
 
+<!-- Подключаем наш скрипт -->
 <script src="{% static 'js/script.js' %}"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Исправлен пробел в src -->
 </body>
 </html>

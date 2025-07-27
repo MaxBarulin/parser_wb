@@ -16,6 +16,11 @@ requests = "^2.32.4"
 pillow = "^11.3.0"
 pandas = "^2.3.1"
 retry = "^0.9.2"
+beautifulsoup4 = "^4.13.4"
+lxml = "^6.0.0"
+selenium = "^4.34.2"
+webdriver-manager = "^4.0.2"
+selenium-stealth = "^1.0.6"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -14,3 +14,20 @@ class Product(models.Model):
     class Meta:
         verbose_name = "Товар"
         verbose_name_plural = "Товары"
+
+class GoldAppleProduct(models.Model):
+    name = models.CharField("Наименование", max_length=255)
+    product_url = models.URLField("Ссылка на продукт", max_length=1024, unique=True)
+    price = models.DecimalField("Цена", max_digits=10, decimal_places=2)
+    rating = models.FloatField("Рейтинг", null=True, blank=True)
+    description = models.TextField("Описание продукта", blank=True)
+    usage = models.TextField("Инструкция по применению", blank=True)
+    country = models.CharField("Страна-производитель", max_length=100, blank=True)
+
+    class Meta:
+        verbose_name = "Продукт (Gold Apple)"
+        verbose_name_plural = "Продукты (Gold Apple)"
+
+    def __str__(self):
+        return self.name
+
