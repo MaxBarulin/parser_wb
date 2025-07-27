@@ -17,7 +17,7 @@ from parser_wb.models import GoldAppleProduct
 
 class Command(BaseCommand):
     """
-    Команда для парсинга Gold Apple (финальная версия с кликами на вкладках товара).
+    Команда для парсинга Gold Apple (финальная версия с последовательным сбором данных из вкладок).
     """
     BASE_URL = "https://goldapple.ru"
 
@@ -111,7 +111,7 @@ class Command(BaseCommand):
 
     def get_product_details(self, driver, product_url: str) -> dict:
         """
-        Собирает детальную информацию, КЛИКАЯ на вкладки для раскрытия контента.
+        Собирает детальную информацию, ПОСЛЕДОВАТЕЛЬНО кликая на вкладки и считывая данные.
         """
         self.stdout.write(f"   > Сбор деталей для: {product_url}")
         details = {'name': '', 'price': Decimal('0.00'), 'rating': None, 'description': '', 'usage': '', 'country': ''}
@@ -128,42 +128,62 @@ class Command(BaseCommand):
             details['price'] = Decimal(''.join(c for c in price_text if c.isdigit()))
 
             try:
-                # Находим рейтинг по селектору из каталога, он часто совпадает
-                rating_text = driver.find_element(By.CSS_SELECTOR, "div.LKAfD").text
+                rating_text = driver.find_element(By.CSS_SELECTOR, "div._9SOmS").text
                 details['rating'] = float(rating_text.replace(',', '.'))
             except Exception:
-                self.stdout.write(self.style.WARNING("     - Рейтинг не найден."))
+                pass
 
-            # --- ФИНАЛЬНАЯ ЛОГИКА: КЛИКИ И СБОР СКРЫТЫХ ДАННЫХ ---
-            self.stdout.write("     - Раскрытие скрытых вкладок...")
-            # Находим все возможные кликабельные заголовки (и вкладки, и аккордеоны)
-            clickable_headers = driver.find_elements(By.CSS_SELECTOR, ".pdp-info-block-item-title, button.ga-tabs-tab")
-            for header in clickable_headers:
-                try:
-                    driver.execute_script("arguments[0].click();", header)
-                    time.sleep(0.5)
-                except Exception:
-                    continue
-            self.stdout.write(self.style.SUCCESS("     - Все вкладки раскрыты."))
+            # --- ФИНАЛЬНАЯ ЛОГИКА: "НАЖАЛ - ПРОЧИТАЛ" ---
+            self.stdout.write("     - Последовательный сбор данных из вкладок...")
 
-            # --- ТЕПЕРЬ СОБИРАЕМ ДАННЫЕ С ПОЛНОСТЬЮ РАСКРЫТОЙ СТРАНИЦЫ ---
+            # 1. Сначала обрабатываем вкладки (tabs)
             try:
-                details['description'] = driver.find_element(By.CSS_SELECTOR, "div[itemprop='description']").text
-            except Exception:
-                self.stdout.write(self.style.WARNING("     - Описание не найдено."))
+                tab_buttons = driver.find_elements(By.CSS_SELECTOR, "button.ga-tabs-tab")
+                for button in tab_buttons:
+                    button_text = button.text.lower()
+                    driver.execute_script("arguments[0].click();", button)
+                    time.sleep(1)  # Ждем появления контента
 
-            all_info_blocks = driver.find_elements(By.CSS_SELECTOR, ".pdp-info-block-item, .iNOUQ")
-            for block in all_info_blocks:
+                    content_panel = driver.find_element(By.CSS_SELECTOR, ".ga-tabs-tab-panel")
+
+                    if 'описание' in button_text:
+                        details['description'] = content_panel.text
+                        self.stdout.write(self.style.SUCCESS("       + Описание найдено."))
+            except Exception:
+                self.stdout.write(self.style.WARNING(
+                    "     - Не удалось обработать блок 'Описание' как вкладку. Пробуем найти его в аккордеоне."))
+                # Если вкладок нет, описание может быть в аккордеоне itemprop
                 try:
-                    block_text = block.text
-                    if 'применение' in block_text.lower():
-                        details['usage'] = block_text.replace('Применение\n', '').strip()
-                    if 'страна-производитель' in block_text.lower() or 'страна происхождения' in block_text.lower():
-                        lines = block_text.split('\n')
-                        for i, line in enumerate(lines):
-                            if 'страна-производитель' in line.lower() or 'страна происхождения' in line.lower():
-                                if i + 1 < len(lines):
+                    if not details['description']:
+                        details['description'] = driver.find_element(By.CSS_SELECTOR,
+                                                                     "div[itemprop='description']").text
+                        self.stdout.write(self.style.SUCCESS("       + Описание найдено (fallback)."))
+                except Exception:
+                    pass
+
+            # 2. Затем обрабатываем "аккордеоны"
+            info_blocks = driver.find_elements(By.CSS_SELECTOR, ".pdp-info-block-item")
+            for block in info_blocks:
+                try:
+                    title_element = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-title")
+                    title_text = title_element.text.lower()
+
+                    driver.execute_script("arguments[0].click();", title_element)
+                    time.sleep(0.5)
+
+                    content_element = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-content")
+                    content_text = content_element.text
+
+                    if 'применение' in title_text:
+                        details['usage'] = content_text
+                        self.stdout.write(self.style.SUCCESS("       + Применение найдено."))
+                    elif 'дополнительная информация' in title_text:
+                        if 'страна производства' in content_text.lower():
+                            lines = content_text.split('\n')
+                            for i, line in enumerate(lines):
+                                if 'страна производства' in line.lower() and i + 1 < len(lines):
                                     details['country'] = lines[i + 1].strip()
+                                    self.stdout.write(self.style.SUCCESS("       + Страна найдена."))
                                     break
                 except Exception:
                     continue
