@@ -4,14 +4,12 @@ import time
 from django.core.management import BaseCommand
 from decimal import Decimal
 
-# --- Импорты для Selenium и Stealth ---
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
+# --- Импорты для Selenium ---
+# Стандартный webdriver больше не нужен напрямую, но By и ожидания нужны
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium_stealth import stealth
+import undetected_chromedriver as uc  # <--- ВАЖНО: Используем новую библиотеку
 
 # Импортируем нашу модель
 from parser_wb.models import GoldAppleProduct
@@ -19,30 +17,28 @@ from parser_wb.models import GoldAppleProduct
 
 class Command(BaseCommand):
     """
-    Команда для парсинга Gold Apple (v15, с надежной прокруткой к кнопке и JS-кликом).
+    Команда для парсинга Gold Apple (финальная версия с undetected-chromedriver).
     """
     BASE_URL = "https://goldapple.ru"
 
     def setup_driver(self):
-        """Настраивает драйвер Chrome с использованием selenium-stealth."""
-        self.stdout.write("Настройка драйвера Selenium с selenium-stealth...")
-        options = webdriver.ChromeOptions()
+        """Настраивает драйвер с использованием undetected-chromedriver."""
+        self.stdout.write("Настройка драйвера undetected-chromedriver...")
+        options = uc.ChromeOptions()
 
-        # --- Чтобы скрыть браузер, раскомментируйте следующую строку ---
-        # options.add_argument("--headless=new")
-
+        # Оставляем браузер видимым для контроля
         options.add_argument("--start-maximized")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
+        # Некоторые дополнительные опции для маскировки
+        options.add_argument('--disable-infobars')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--profile-directory=Default')
+        options.add_argument("--incognito")
+        options.add_argument("--disable-plugins-discovery")
 
-        service = ChromeService(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
+        # --- ВАЖНО: Используем undetected_chromedriver ---
+        driver = uc.Chrome(options=options, use_subprocess=True)
 
-        stealth(
-            driver, languages=["ru-RU", "ru"], vendor="Google Inc.",
-            platform="Win32", webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine", fix_hairline=True,
-        )
+        # --- selenium-stealth больше не нужен, undetected-chromedriver делает все сам ---
 
         self.stdout.write(self.style.SUCCESS("Драйвер успешно настроен."))
         return driver
@@ -50,7 +46,7 @@ class Command(BaseCommand):
     def handle_popups(self, driver):
         """Надежно ищет и закрывает все возможные всплывающие окна."""
         self.stdout.write("   Поиск и закрытие всплывающих окон...")
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 15)  # Увеличим время ожидания
 
         try:
             city_button = wait.until(
@@ -70,17 +66,17 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("   Баннер cookie не найден."))
 
     def get_product_urls(self, driver, category_slug: str, clicks_to_make: int):
-        """Собирает URL товаров, надежно нажимая на кнопку 'Показать ещё'."""
+        """Собирает URL товаров, нажимая на кнопку 'Показать ещё'."""
         category_url = f"{self.BASE_URL}/{category_slug}"
         self.stdout.write(f"1. Загрузка страницы категории: {category_url}")
         driver.get(category_url)
 
-        self.stdout.write("   Пауза 7 секунд для полной прогрузки JavaScript...")
-        time.sleep(7)
+        # Увеличиваем паузу, чтобы дать всем скриптам защиты полностью прогрузиться
+        self.stdout.write("   Пауза 10 секунд для полной инициализации страницы...")
+        time.sleep(10)
 
         self.handle_popups(driver)
 
-        # --- НОВАЯ, САМАЯ НАДЕЖНАЯ ЛОГИКА ---
         for i in range(clicks_to_make):
             try:
                 self.stdout.write(f"\n   Итерация ({i + 1}/{clicks_to_make})")
@@ -89,23 +85,18 @@ class Command(BaseCommand):
                 before_count = len(driver.find_elements(By.CSS_SELECTOR, product_selector))
                 self.stdout.write(f"   Товаров на странице до нажатия: {before_count}")
 
-                # 1. Находим кнопку
                 load_more_button_selector = "button[data-transaction-name='ga-load-button']"
                 load_more_button = WebDriverWait(driver, 15).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, load_more_button_selector))
                 )
 
-                # 2. Прокручиваем к кнопке, помещая ее в центр видимой области
-                self.stdout.write("   Прокрутка к кнопке 'Показать ещё'...")
                 driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
                                       load_more_button)
-                time.sleep(3)  # Пауза, чтобы прокрутка завершилась
+                time.sleep(3)
 
-                # 3. Нажимаем на кнопку самым надежным способом - через JS
                 driver.execute_script("arguments[0].click();", load_more_button)
                 self.stdout.write(self.style.SUCCESS("   Кнопка нажата."))
 
-                # 4. Интеллектуально ждем, пока количество товаров не увеличится
                 self.stdout.write("   Ожидание загрузки новых товаров...")
                 WebDriverWait(driver, 30).until(
                     lambda d: len(d.find_elements(By.CSS_SELECTOR, product_selector)) > before_count
@@ -117,7 +108,6 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.WARNING("   Кнопка 'Показать ещё' не найдена. Считаем, что все товары загружены."))
                 break
-        # --- КОНЕЦ НОВОЙ ЛОГИКИ ---
 
         self.stdout.write("\nСбор всех загруженных ссылок на товары...")
         product_urls = set()
@@ -131,41 +121,54 @@ class Command(BaseCommand):
         return list(product_urls)
 
     def get_product_details(self, driver, product_url: str) -> dict:
+        """Собирает детальную информацию, кликая на вкладки для раскрытия контента."""
         self.stdout.write(f"   > Сбор деталей для: {product_url}")
         details = {'name': '', 'price': Decimal('0.00'), 'rating': None, 'description': '', 'usage': '', 'country': ''}
         try:
             driver.get(product_url)
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.WpXpS")))
+
             brand = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS a[content]").get_attribute('content')
             title = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS span[itemprop='name']").text
             details['name'] = f"{brand} {title}"
+
             price_text = driver.find_element(By.CSS_SELECTOR, "div._0Ewqc").text
             details['price'] = Decimal(''.join(c for c in price_text if c.isdigit()))
+
             try:
                 rating_text = driver.find_element(By.CSS_SELECTOR, "div._9SOmS").text
                 details['rating'] = float(rating_text.replace(',', '.'))
             except Exception:
                 pass
-            try:
-                details['description'] = driver.find_element(By.CSS_SELECTOR, "div[itemprop='description']").text
-            except Exception:
-                pass
-            all_info_blocks = driver.find_elements(By.CSS_SELECTOR, ".pdp-info-block-item")
-            for block in all_info_blocks:
+
+            info_titles = driver.find_elements(By.CSS_SELECTOR, ".pdp-info-block-item-title")
+            for title_element in info_titles:
                 try:
-                    block_title = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-title").text.lower()
-                    block_content = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-content").text
-                    if 'применение' in block_title:
-                        details['usage'] = block_content
-                    elif 'страна-производитель' in block_title or 'страна происхождения' in block_title:
-                        details['country'] = block_content.split('\n')[0]
+                    title_text = title_element.text.lower()
+                    driver.execute_script("arguments[0].click();", title_element)
+                    time.sleep(0.5)
+                    content_element = title_element.find_element(By.XPATH, "./following-sibling::div")
+                    content_text = content_element.text
+                    if 'описание' in title_text:
+                        details['description'] = content_text
+                    elif 'применение' in title_text:
+                        details['usage'] = content_text
+                    elif 'дополнительная информация' in title_text:
+                        if 'страна-производитель' in content_text.lower():
+                            lines = content_text.split('\n')
+                            for i, line in enumerate(lines):
+                                if 'страна-производитель' in line.lower() and i + 1 < len(lines):
+                                    details['country'] = lines[i + 1].strip()
+                                    break
                 except Exception:
                     continue
+
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"     [!] Ошибка при сборе деталей для {product_url}: {e}"))
         return details
 
     def save_data_to_db(self, data: list):
+        """Сохраняет данные в базу."""
         self.stdout.write("\n3. Сохранение данных в базу...")
         count, _ = GoldAppleProduct.objects.all().delete()
         self.stdout.write(f"   Удалено {count} старых записей.")
@@ -183,7 +186,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         """Основная функция, запускающая парсер."""
         category_slug = "parfjumerija"
-        clicks_count = 4  # Увеличиваем количество попыток с большим запасом
+        clicks_count = 4
 
         driver = self.setup_driver()
         all_products_data = []
@@ -193,7 +196,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING("Не удалось собрать ссылки на товары. Прерывание выполнения."))
                 return
 
-            self.stdout.write(f"\n2. Начало сбора детальной информации для {min(len(urls), 100)} товаров...")
+            self.stdout.write(f"\n2. Начало сбора детальной информации для {min(len(urls), 20)} товаров...")
             for url in urls[:20]:
                 details = self.get_product_details(driver, url)
                 details['product_url'] = url

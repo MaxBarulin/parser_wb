@@ -21,6 +21,8 @@ lxml = "^6.0.0"
 selenium = "^4.34.2"
 webdriver-manager = "^4.0.2"
 selenium-stealth = "^1.0.6"
+undetected-chromedriver = "^3.5.5"
+setuptools = "^80.9.0"
 
 
 [tool.poetry.group.dev.dependencies]
