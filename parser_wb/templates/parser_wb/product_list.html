@@ -1,19 +1,24 @@
-<!-- F:/replicate/parser_wb/templates/parser_wb/product_list.html -->
+<!-- F:/replicate/parser_wb/templates/parser_wb/product_list.html (v2) -->
 <!DOCTYPE html>
 {% load static %}
 <html lang="ru">
 <head>
-    <meta charset="UTF-T">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Список товаров (Gold Apple)</title>
-    <!-- Вы можете добавить сюда свой CSS, если он есть -->
     <style>
         body { font-family: sans-serif; margin: 2em; }
-        .container { max-width: 1200px; margin: auto; }
+        .container { max-width: 1400px; margin: auto; }
         .controls { display: flex; gap: 2em; margin-bottom: 1em; padding: 1em; background: #f4f4f4; border-radius: 8px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; word-wrap: break-word; }
         th { background-color: #f2f2f2; }
+        /* Зададим ширину колонок для лучшего отображения */
+        th:nth-child(1) { width: 25%; } /* Название */
+        th:nth-child(2), th:nth-child(3), th:nth-child(4) { width: 8%; } /* Цена, Рейтинг, Страна */
+        th:nth-child(5) { width: 25%; } /* Описание */
+        th:nth-child(6) { width: 20%; } /* Применение */
+        th:nth-child(7) { width: 6%; } /* Ссылка */
     </style>
 </head>
 <body>
@@ -21,6 +26,7 @@
     <h1>Список товаров из Gold Apple</h1>
 
     <div class="controls">
+        <!-- Фильтры и сортировка остаются без изменений -->
         <div class="filters">
             <h3>Фильтры</h3>
             <div>
@@ -33,7 +39,6 @@
                 <input type="number" id="minRating" min="0" max="5" step="0.1" value="0">
             </div>
         </div>
-
         <div class="sorting">
             <h3>Сортировка</h3>
             <select id="sortOptions">
@@ -55,17 +60,20 @@
             <th>Цена (₽)</th>
             <th>Рейтинг</th>
             <th>Страна</th>
+            <th>Описание</th> <!-- ДОБАВЛЕНО -->
+            <th>Применение</th> <!-- ДОБАВЛЕНО -->
             <th>Ссылка</th>
         </tr>
         </thead>
         <tbody>
         {% for product in products %}
         <tr>
-            <!-- Эти скрытые теги будут использоваться JS для чтения данных -->
             <td class="product-name">{{ product.name }}</td>
             <td class="product-price">{{ product.price }}</td>
             <td class="product-rating">{{ product.rating|default:"0" }}</td>
             <td class="product-country">{{ product.country|default:"-" }}</td>
+            <td class="product-description">{{ product.description|default:"-" }}</td> <!-- ДОБАВЛЕНО -->
+            <td class="product-usage">{{ product.usage|default:"-" }}</td>       <!-- ДОБАВЛЕНО -->
             <td class="product-url"><a href="{{ product.product_url }}" target="_blank">Перейти</a></td>
         </tr>
         {% endfor %}
@@ -73,7 +81,6 @@
     </table>
 </div>
 
-<!-- Подключаем наш скрипт -->
-<script src="{% static 'js/script.js' %}"></script>
+<script src="{% static 'parser_wb/js/script.js' %}"></script>
 </body>
 </html>
