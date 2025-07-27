@@ -17,7 +17,7 @@ from parser_wb.models import GoldAppleProduct
 
 class Command(BaseCommand):
     """
-    Команда для парсинга Gold Apple (финальная версия с последовательным сбором данных из вкладок).
+    Команда для парсинга Gold Apple (финальная версия с надежным последовательным сбором).
     """
     BASE_URL = "https://goldapple.ru"
 
@@ -32,9 +32,6 @@ class Command(BaseCommand):
         options.add_argument("--start-maximized")
         options.add_argument('--disable-infobars')
         options.add_argument('--disable-extensions')
-        options.add_argument('--profile-directory=Default')
-        options.add_argument("--incognito")
-        options.add_argument("--disable-plugins-discovery")
 
         driver = uc.Chrome(options=options, use_subprocess=True)
 
@@ -111,7 +108,7 @@ class Command(BaseCommand):
 
     def get_product_details(self, driver, product_url: str) -> dict:
         """
-        Собирает детальную информацию, ПОСЛЕДОВАТЕЛЬНО кликая на вкладки и считывая данные.
+        Собирает детальную информацию, последовательно обрабатывая вкладки и аккордеоны.
         """
         self.stdout.write(f"   > Сбор деталей для: {product_url}")
         details = {'name': '', 'price': Decimal('0.00'), 'rating': None, 'description': '', 'usage': '', 'country': ''}
@@ -119,71 +116,55 @@ class Command(BaseCommand):
             driver.get(product_url)
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.WpXpS")))
 
-            # Сбор видимых данных
+            # Шаг 1: Сбор всех видимых данных
             brand = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS a[content]").get_attribute('content')
             title = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS span[itemprop='name']").text
             details['name'] = f"{brand} {title}"
-
             price_text = driver.find_element(By.CSS_SELECTOR, "div._0Ewqc").text
             details['price'] = Decimal(''.join(c for c in price_text if c.isdigit()))
-
             try:
                 rating_text = driver.find_element(By.CSS_SELECTOR, "div._9SOmS").text
                 details['rating'] = float(rating_text.replace(',', '.'))
             except Exception:
                 pass
 
-            # --- ФИНАЛЬНАЯ ЛОГИКА: "НАЖАЛ - ПРОЧИТАЛ" ---
-            self.stdout.write("     - Последовательный сбор данных из вкладок...")
-
-            # 1. Сначала обрабатываем вкладки (tabs)
+            # Шаг 2: Сбор описания (которое обычно видно сразу)
             try:
-                tab_buttons = driver.find_elements(By.CSS_SELECTOR, "button.ga-tabs-tab")
-                for button in tab_buttons:
-                    button_text = button.text.lower()
-                    driver.execute_script("arguments[0].click();", button)
-                    time.sleep(1)  # Ждем появления контента
-
-                    content_panel = driver.find_element(By.CSS_SELECTOR, ".ga-tabs-tab-panel")
-
-                    if 'описание' in button_text:
-                        details['description'] = content_panel.text
-                        self.stdout.write(self.style.SUCCESS("       + Описание найдено."))
+                description_element = driver.find_element(By.CSS_SELECTOR, "div[itemprop='description']")
+                details['description'] = description_element.text
+                self.stdout.write(self.style.SUCCESS("     + Описание найдено."))
             except Exception:
-                self.stdout.write(self.style.WARNING(
-                    "     - Не удалось обработать блок 'Описание' как вкладку. Пробуем найти его в аккордеоне."))
-                # Если вкладок нет, описание может быть в аккордеоне itemprop
-                try:
-                    if not details['description']:
-                        details['description'] = driver.find_element(By.CSS_SELECTOR,
-                                                                     "div[itemprop='description']").text
-                        self.stdout.write(self.style.SUCCESS("       + Описание найдено (fallback)."))
-                except Exception:
-                    pass
+                self.stdout.write(self.style.WARNING("     - Описание не найдено."))
 
-            # 2. Затем обрабатываем "аккордеоны"
+            # Шаг 3: Последовательная обработка аккордеонов
+            self.stdout.write("     - Поиск и обработка аккордеонов...")
             info_blocks = driver.find_elements(By.CSS_SELECTOR, ".pdp-info-block-item")
             for block in info_blocks:
                 try:
                     title_element = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-title")
                     title_text = title_element.text.lower()
 
+                    # Кликаем, чтобы раскрыть
                     driver.execute_script("arguments[0].click();", title_element)
                     time.sleep(0.5)
 
+                    # Сразу читаем контент
                     content_element = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-content")
                     content_text = content_element.text
 
                     if 'применение' in title_text:
                         details['usage'] = content_text
-                        self.stdout.write(self.style.SUCCESS("       + Применение найдено."))
+                        self.stdout.write(self.style.SUCCESS(f"       + Найдена информация: '{title_text}'"))
                     elif 'дополнительная информация' in title_text:
-                        if 'страна производства' in content_text.lower():
+                        if 'страна-производитель' in content_text.lower() or 'страна происхождения' in content_text.lower():
                             lines = content_text.split('\n')
                             for i, line in enumerate(lines):
-                                if 'страна производства' in line.lower() and i + 1 < len(lines):
+                                if (
+                                        'страна-производитель' in line.lower() or 'страна происхождения' in line.lower()) and i + 1 < len(
+                                        lines):
                                     details['country'] = lines[i + 1].strip()
-                                    self.stdout.write(self.style.SUCCESS("       + Страна найдена."))
+                                    self.stdout.write(self.style.SUCCESS(
+                                        f"       + Найдена информация: '{title_text}' -> {details['country']}"))
                                     break
                 except Exception:
                     continue
@@ -221,13 +202,13 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING("Не удалось собрать ссылки на товары. Прерывание выполнения."))
                 return
 
-            self.stdout.write(f"\n2. Начало сбора детальной информации для {min(len(urls), 10)} товаров...")
-            for i, url in enumerate(urls[:10]):
+            self.stdout.write(f"\n2. Начало сбора детальной информации для {min(len(urls), 3)} товаров...")
+            for i, url in enumerate(urls[:3]):
                 details = self.get_product_details(driver, url)
                 details['product_url'] = url
                 all_products_data.append(details)
 
-                if i < len(urls[:10]) - 1:
+                if i < len(urls[:3]) - 1:
                     pause = random.uniform(1.5, 4.0)
                     self.stdout.write(f"   --- Пауза {pause:.1f} сек. ---")
                     time.sleep(pause)
@@ -238,4 +219,7 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"\nПроизошла критическая ошибка: {e}"))
         finally:
             self.stdout.write("\nЗавершение работы, закрытие драйвера.")
-            driver.quit()
+            try:
+                driver.quit()
+            except Exception:
+                pass
