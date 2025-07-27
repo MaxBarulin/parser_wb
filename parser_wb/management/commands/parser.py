@@ -163,16 +163,21 @@ class Command(BaseCommand):
 
             # 4. Сбор рейтинга (новый подход)
             try:
-                # Ищем блок с текстом "Рейтинг" или "Rating"
-                rating_block = driver.find_element(By.XPATH,
-                                                   "//*[contains(text(), 'Рейтинг') or contains(text(), 'Rating')]/following-sibling::div | "
-                                                   "//div[contains(@class, 'rating')]")
-
-                rating_text = rating_block.text.replace(',', '.').strip()
-                details['rating'] = float(rating_text.split()[0])  # Берем первое число из текста
-                self.stdout.write(self.style.SUCCESS(f"   + Рейтинг найден: {details['rating']}"))
-            except Exception:
-                self.stdout.write(self.style.WARNING("   - Рейтинг не найден"))
+                # Вариант 2 - поиск по абсолютному XPath (как в вашем примере)
+                rating_element = driver.find_element(
+                    By.XPATH, '//*[@id="__layout"]/div/main/div[2]/div/div[3]/a[1]/div/div[1]'
+                )
+                rating_text = rating_element.text.strip()
+                details['rating'] = float(rating_text.replace(',', '.'))
+                self.stdout.write(
+                    self.style.SUCCESS(f"   + Рейтинг найден (абсолютный XPath)2: {details['rating']}"))
+            except Exception as e3:
+                    self.stdout.write(self.style.WARNING("   - Рейтинг не найден3"))
+                    details['rating'] = None
+                    # Для отладки сохраняем HTML
+                    with open("debug_rating.html", "w", encoding="utf-8") as f:
+                        f.write(driver.page_source)
+                    self.stdout.write("   Сохранен HTML страницы в debug_rating.html")
 
             # 5. Сбор описания (расширенный поиск)
             try:
