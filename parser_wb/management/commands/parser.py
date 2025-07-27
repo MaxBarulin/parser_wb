@@ -163,21 +163,42 @@ class Command(BaseCommand):
 
             # 4. Сбор рейтинга (новый подход)
             try:
-                # Вариант 2 - поиск по абсолютному XPath (как в вашем примере)
-                rating_element = driver.find_element(
-                    By.XPATH, '//*[@id="__layout"]/div/main/div[2]/div/div[3]/a[1]/div/div[1]'
+                # Вариант 1 - поиск по конкретной структуре из примера
+                rating_element = WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, "//a[contains(@class, '_5kgRL')]//div[@class='_9SOmS']")
+                    )
                 )
                 rating_text = rating_element.text.strip()
                 details['rating'] = float(rating_text.replace(',', '.'))
-                self.stdout.write(
-                    self.style.SUCCESS(f"   + Рейтинг найден (абсолютный XPath)2: {details['rating']}"))
-            except Exception as e3:
-                    self.stdout.write(self.style.WARNING("   - Рейтинг не найден3"))
-                    details['rating'] = None
-                    # Для отладки сохраняем HTML
-                    with open("debug_rating.html", "w", encoding="utf-8") as f:
-                        f.write(driver.page_source)
-                    self.stdout.write("   Сохранен HTML страницы в debug_rating.html")
+                self.stdout.write(self.style.SUCCESS(f"   + Рейтинг найден (основной способ): {details['rating']}"))
+            except Exception as e1:
+                try:
+                    # Вариант 2 - поиск по абсолютному XPath (как в вашем примере)
+                    rating_element = driver.find_element(
+                        By.XPATH, '//*[@id="__layout"]/div/main/div[2]/div/div[3]/a[1]/div/div[1]'
+                    )
+                    rating_text = rating_element.text.strip()
+                    details['rating'] = float(rating_text.replace(',', '.'))
+                    self.stdout.write(
+                        self.style.SUCCESS(f"   + Рейтинг найден (абсолютный XPath): {details['rating']}"))
+                except Exception as e2:
+                    try:
+                        # Вариант 3 - поиск по тексту рядом с рейтингом
+                        rating_element = driver.find_element(
+                            By.XPATH, "//div[contains(text(), 'оценка товара')]/preceding-sibling::div[1]"
+                        )
+                        rating_text = rating_element.text.strip()
+                        details['rating'] = float(rating_text.replace(',', '.'))
+                        self.stdout.write(
+                            self.style.SUCCESS(f"   + Рейтинг найден (по соседнему элементу): {details['rating']}"))
+                    except Exception as e3:
+                        self.stdout.write(self.style.WARNING("   - Рейтинг не найден"))
+                        details['rating'] = None
+                        # Для отладки сохраняем HTML
+                        with open("debug_rating.html", "w", encoding="utf-8") as f:
+                            f.write(driver.page_source)
+                        self.stdout.write("   Сохранен HTML страницы в debug_rating.html")
 
             # 5. Сбор описания (расширенный поиск)
             try:
