@@ -108,69 +108,118 @@ class Command(BaseCommand):
 
     def get_product_details(self, driver, product_url: str) -> dict:
         """
-        Собирает детальную информацию, последовательно обрабатывая вкладки и аккордеоны.
+        Улучшенный метод сбора данных с Gold Apple
+        - Надежно собирает все основные данные
+        - Имеет несколько fallback-вариантов для каждого поля
+        - Подробное логирование процесса
         """
-        self.stdout.write(f"   > Сбор деталей для: {product_url}")
-        details = {'name': '', 'price': Decimal('0.00'), 'rating': None, 'description': '', 'usage': '', 'country': ''}
-        try:
-            driver.get(product_url)
-            WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.WpXpS")))
+        self.stdout.write(f"\n> Сбор данных для: {product_url}")
+        details = {
+            'name': '',
+            'price': Decimal('0.00'),
+            'rating': None,
+            'description': '',
+            'usage': '',
+            'country': '',
+            'product_url': product_url
+        }
 
-            # Шаг 1: Сбор всех видимых данных
-            brand = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS a[content]").get_attribute('content')
-            title = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS span[itemprop='name']").text
-            details['name'] = f"{brand} {title}"
-            price_text = driver.find_element(By.CSS_SELECTOR, "div._0Ewqc").text
-            details['price'] = Decimal(''.join(c for c in price_text if c.isdigit()))
+        try:
+            # 1. Загрузка страницы с увеличенным временем ожидания
+            driver.get(product_url)
+            WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "h1"))
+            )
+            time.sleep(3)  # Дополнительная пауза для стабилизации
+
+            # 2. Сбор названия товара
+            try:
+                brand = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS a[content]").get_attribute('content')
+                title = driver.find_element(By.CSS_SELECTOR, "h1.WpXpS span[itemprop='name']").text
+                details['name'] = f"{brand} {title}".strip()
+                self.stdout.write(self.style.SUCCESS("   + Название собрано"))
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f"   - Не удалось собрать название: {e}"))
+
+            # 3. Сбор цены (несколько вариантов селекторов)
+            try:
+                # Основной селектор
+                price_text = driver.find_element(By.CSS_SELECTOR, "div._0Ewqc").text
+                details['price'] = Decimal(''.join(c for c in price_text if c.isdigit()))
+                self.stdout.write(self.style.SUCCESS(f"   + Цена собрана: {details['price']}"))
+            except Exception:
+                try:
+                    # Fallback-селектор
+                    price_text = driver.find_element(By.CSS_SELECTOR, "div[data-test-id='price-current']").text
+                    details['price'] = Decimal(''.join(c for c in price_text if c.isdigit()))
+                    self.stdout.write(self.style.SUCCESS(f"   + Цена (fallback): {details['price']}"))
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f"   - Не удалось собрать цену: {e}"))
+
+            # 4. Сбор рейтинга
             try:
                 rating_text = driver.find_element(By.CSS_SELECTOR, "div._9SOmS").text
                 details['rating'] = float(rating_text.replace(',', '.'))
+                self.stdout.write(self.style.SUCCESS(f"   + Рейтинг: {details['rating']}"))
             except Exception:
-                pass
+                self.stdout.write(self.style.WARNING("   - Рейтинг не найден"))
 
-            # Шаг 2: Сбор описания (которое обычно видно сразу)
+            # 5. Сбор описания (несколько вариантов)
             try:
-                description_element = driver.find_element(By.CSS_SELECTOR, "div[itemprop='description']")
-                details['description'] = description_element.text
-                self.stdout.write(self.style.SUCCESS("     + Описание найдено."))
+                # Основной вариант
+                desc = driver.find_element(By.CSS_SELECTOR, "div[itemprop='description']").text
+                details['description'] = desc.strip()
+                self.stdout.write(self.style.SUCCESS("   + Описание найдено (основное)"))
             except Exception:
-                self.stdout.write(self.style.WARNING("     - Описание не найдено."))
+                try:
+                    # Альтернативный вариант
+                    desc = driver.find_element(By.CSS_SELECTOR, ".product-description").text
+                    details['description'] = desc.strip()
+                    self.stdout.write(self.style.SUCCESS("   + Описание найдено (альтернативное)"))
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f"   - Описание не найдено: {e}"))
 
-            # Шаг 3: Последовательная обработка аккордеонов
-            self.stdout.write("     - Поиск и обработка аккордеонов...")
+            # 6. Сбор применения и страны через аккордеоны
+            self.stdout.write("   - Обработка информационных блоков...")
             info_blocks = driver.find_elements(By.CSS_SELECTOR, ".pdp-info-block-item")
+
             for block in info_blocks:
                 try:
-                    title_element = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-title")
-                    title_text = title_element.text.lower()
+                    # Раскрываем блок
+                    header = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-title")
+                    driver.execute_script("arguments[0].click();", header)
+                    time.sleep(0.3)  # Короткая пауза для анимации
 
-                    # Кликаем, чтобы раскрыть
-                    driver.execute_script("arguments[0].click();", title_element)
-                    time.sleep(0.5)
+                    # Получаем данные
+                    title = header.text.lower()
+                    content = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-content").text
 
-                    # Сразу читаем контент
-                    content_element = block.find_element(By.CSS_SELECTOR, ".pdp-info-block-item-content")
-                    content_text = content_element.text
+                    if 'применение' in title and not details['usage']:
+                        details['usage'] = content.strip()
+                        self.stdout.write(self.style.SUCCESS("     + Применение найдено"))
 
-                    if 'применение' in title_text:
-                        details['usage'] = content_text
-                        self.stdout.write(self.style.SUCCESS(f"       + Найдена информация: '{title_text}'"))
-                    elif 'дополнительная информация' in title_text:
-                        if 'страна-производитель' in content_text.lower() or 'страна происхождения' in content_text.lower():
-                            lines = content_text.split('\n')
-                            for i, line in enumerate(lines):
-                                if (
-                                        'страна-производитель' in line.lower() or 'страна происхождения' in line.lower()) and i + 1 < len(
-                                        lines):
-                                    details['country'] = lines[i + 1].strip()
-                                    self.stdout.write(self.style.SUCCESS(
-                                        f"       + Найдена информация: '{title_text}' -> {details['country']}"))
-                                    break
-                except Exception:
+                    if ('страна' in title or 'произв' in title) and not details['country']:
+                        # Ищем конкретно строку со страной
+                        for line in content.split('\n'):
+                            if 'страна' in line.lower():
+                                details['country'] = line.split(':')[-1].strip()
+                                self.stdout.write(self.style.SUCCESS(f"     + Страна: {details['country']}"))
+                                break
+
+                except Exception as e:
                     continue
 
         except Exception as e:
-            self.stderr.write(self.style.ERROR(f"     [!] Ошибка при сборе деталей для {product_url}: {e}"))
+            self.stderr.write(self.style.ERROR(f"   [!] Критическая ошибка: {e}"))
+        if not details['country']:
+            try:
+                # Дополнительный поиск страны
+                country = driver.find_element(
+                    By.XPATH, "//*[contains(text(), 'Страна производства')]/following-sibling::div"
+                ).text
+                details['country'] = country.strip()
+            except Exception:
+                pass
         return details
 
     def save_data_to_db(self, data: list):
@@ -218,8 +267,8 @@ class Command(BaseCommand):
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"\nПроизошла критическая ошибка: {e}"))
         finally:
-            self.stdout.write("\nЗавершение работы, закрытие драйвера.")
             try:
+                self.stdout.write("\nЗавершение работы, закрытие драйвера.")
                 driver.quit()
             except Exception:
                 pass
